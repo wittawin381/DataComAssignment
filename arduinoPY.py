@@ -8,7 +8,7 @@ import serial
 # dac = adafruit_mcp4725.MCP4725(i2c)
 
 # boards = pyfirmata.Arduino('COM13')
-ser = serial.Serial('COM8',115200)
+ser = serial.Serial('COM11',115200)
 
 ACK = '#'
 dt = list()

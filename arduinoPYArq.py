@@ -8,10 +8,10 @@ import serial
 # dac = adafruit_mcp4725.MCP4725(i2c)
 
 # boards = pyfirmata.Arduino('COM13')
-ser = serial.Serial('COM8',115200)
+ser = serial.Serial('COM11',115200)
 
 ACK = '#'
-dt = list()
+dt = ''
 receivedData = ''
 receivedDataFinal = ''
 transfering = 0
@@ -35,9 +35,9 @@ def sendData(data):
 def makeFrame(cmd,sum):
     print('makeframe')
     frame = ''
-    frame += chr(17) #flag
+    frame += '#' #flag
     if cmd == 'w':
-        frame += chr(1)
+        frame += 'w'
     if cmd == 'e':
         frame += chr(2)
     if cmd == 'r':
@@ -49,34 +49,36 @@ def makeFrame(cmd,sum):
     if cmd == 'f':
         frame += chr(6)
     frame += sum
-    frame += chr(17)
+    frame += '#'
     print(frame)
     return frame
-
+recCount = 0
 def receiveData():
     global receivedData
+    global recCount
+    global dt
     count = 0
     print('wait for response')
-    while True:
+    if ser.in_waiting > 0:
         print('received img data')
-        receivedData += (ser.readline()).decode()
-        tmp = bitToChar(receivedData)
-        print('received data',tmp)
-        if tmp == chr(17):
-            count += 1
-        if count >= 2:
-            imgData = open("data.txt","a")
-            imgData.write(dt[1:len(dt)-3])
-            imgData.close()
-            return 0
-        dt.append(tmp)
+        if recCount == 0:
+            ser.read(4)
+            recCount+=1
+        receivedData += (ser.read(8)).decode()
+        # tmp = bitToChar(receivedData)
+        print('received data',receivedData)
+        dt = receivedData
+        imgData = open("data.txt","a")
+        imgData.write(receivedData[1:6])
+        imgData.close()
+        # dt.append(tmp)
         receivedData =''
         
     return 0
         
 
 def sendAck():
-    framedAck = makeFrame(ACK,ACK)
+    framedAck = makeFrame(ACK,'x')
     print('sending ACK : ',framedAck)
     sendData(framedAck)
 
@@ -93,49 +95,79 @@ def pow(i):
         n *= 2
     return n
 
-def receiveAck():
+def receiveCommand():
     global receivedData
     size = 0
-    # count = 0#change
-    global dataCount
+    count = 0
+    global dt
+    global dataCount #change
     if ser.in_waiting > 0:
-        print('wait for ack')
-        receivedData += (ser.readline()).decode()
-        # receivedData += testframe[size:size+8]
-        tmp = bitToChar(receivedData)
-        print('received ack',tmp)
-        size+=8
+        print('receivingAck')
         
-        if tmp ==  chr(17):
-            dataCount += 1
-        if dataCount >= 2:
-            return
-            # return 0
-        dt.append(tmp)
+        receivedData += (ser.read(4)).decode()
+        # dt = receivedData
+        print(receivedData)
+        dt = receivedData
+        # receivedData += testframe[size:size+8]
+        # tmp = bitToChar(receivedData)
+        # print('received data',tmp)
+        # if tmp == chr(17):
+        #     dataCount += 1
+        # if count >= 2:
+        #     return
+        #     # return 0
+        # dt.append(tmp)
         receivedData ='' #add
-        # break
         # write-file
         # if len(dt) >= 2:
         #     return 0
+    return
     # return 0
-
+count = 0
 while True:
     cmd = input("Input :")
     transfering = 1
-    dt.clear()
+    dt = ''
     framed = makeFrame(cmd,cmd)
     sendData(framed)
+    time.sleep(1)
     timestart = time.time()
-    while time.time() < timestart + 2:
-        receiveAck()
+    # while len(dt) == 0:
+    #     # time.sleep(1)
+    #     # print("HELLO")
+    #     if(len(dt) > 0):
+    #         break
+    #     receiveCommand()
+        # time.sleep(1)
+    
+    time.sleep(1)
     while len(dt) == 0:
-        framed = makeFrame(buffer,'w')
+        framed = makeFrame(cmd,'w')
         print('resend framed',framed)
         ser.write(framed.encode())
         timestart = time.time()
-        while time.time() < timestart + 2:
-            receiveAck()
-    dt.clear()
+        while time.time() < timestart + 3:
+            receiveCommand()
+            time.sleep(1)
+    dt = ''
+    transfering = 1
+    time.sleep(1)
     while transfering:
-        transfering = receiveData()
-        sendAck()
+        time.sleep(1)
+
+        # while(len(dt) == 0):    
+        receiveData()
+        
+        time.sleep(1)
+        # time.sleep(1)
+        framed = '@##@'
+        print('send Ack',framed)
+        sendData(framed)
+        # if(dt == '@w@'):
+        #     break
+        # dt = ''
+        print('dt : ',dt)
+        if(len(dt) == 8 and dt[0] == '@' and dt[1] =='w' and dt[2] == '@'):
+            transfering = 0
+        dt = ''
+        time.sleep(1)
